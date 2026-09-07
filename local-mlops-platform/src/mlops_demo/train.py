@@ -112,7 +112,7 @@ def _log_to_mlflow(
             signature = infer_signature(X_train, model.predict(X_train))
             mlflow.sklearn.log_model(
                 model,
-                name="model",
+                artifact_path="model",
                 signature=signature,
                 input_example=X_train.head(3),
                 registered_model_name=config.model_name if promote else None,
