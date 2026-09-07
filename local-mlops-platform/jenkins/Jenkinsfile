@@ -1,0 +1,152 @@
+// Jenkins CI pipeline for the NYC Taxi MLOps demo.
+//
+// Responsibility split:  Jenkins = CI (test, train, quality gate, build, push).
+//                        Argo CD = CD/GitOps (deploy from Git).
+// Jenkins deliberately does NOT deploy to Kubernetes.
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  environment {
+    PROJECT_DIR = 'local-mlops-platform'
+    VENV        = '.venv-ci'
+    IMAGE_NAME  = 'localhost:5001/taxi-fare-predictor-serve'
+    IMAGE_TAG   = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'dev'}"
+    MLFLOW_ENABLED = 'false'   // set true + MLFLOW_TRACKING_URI to log to a server
+    MIN_R2      = '0.80'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Tooling check') {
+      steps {
+        sh '''
+          set -e
+          cd "$PROJECT_DIR"
+          command -v python3 >/dev/null || { echo "python3 missing on agent"; exit 1; }
+          python3 --version
+          command -v docker >/dev/null || echo "WARN: docker not found - Build/Push stages will fail. Install docker on the agent or run them on a docker-capable node."
+        '''
+      }
+    }
+
+    stage('Setup & Install') {
+      steps {
+        sh '''
+          set -e
+          cd "$PROJECT_DIR"
+          python3 -m venv "$VENV"
+          . "$VENV/bin/activate"
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt -e .
+        '''
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"; . "$VENV/bin/activate"
+          ruff check src tests
+        '''
+      }
+    }
+
+    stage('Unit Tests') {
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"; . "$VENV/bin/activate"
+          python -m pytest -q -m "not integration and not e2e" \
+            --junitxml=reports/junit.xml
+        '''
+      }
+      post {
+        always { junit allowEmptyResults: true, testResults: "${PROJECT_DIR}/reports/junit.xml" }
+      }
+    }
+
+    stage('Train Model') {
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"; . "$VENV/bin/activate"
+          python -m mlops_demo.train
+        '''
+      }
+    }
+
+    stage('Evaluate / Quality Gate') {
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"; . "$VENV/bin/activate"
+          # Non-zero exit if r2 < MIN_R2 -> fails the build, blocks promotion.
+          python -m mlops_demo.evaluate
+        '''
+      }
+    }
+
+    stage('Build Image') {
+      when { expression { sh(script: 'command -v docker >/dev/null', returnStatus: true) == 0 } }
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"
+          docker build -f docker/Dockerfile.kserve \
+            -t "$IMAGE_NAME:$IMAGE_TAG" -t "$IMAGE_NAME:latest" .
+        '''
+      }
+    }
+
+    stage('Image Validation') {
+      when { expression { sh(script: 'command -v docker >/dev/null', returnStatus: true) == 0 } }
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"
+          # Basic smoke check: the image starts and reports healthy.
+          docker run -d --name taxi_ci_$BUILD_NUMBER -p 18080:8080 "$IMAGE_NAME:$IMAGE_TAG"
+          for i in $(seq 1 15); do
+            curl -sf http://127.0.0.1:18080/healthz && break || sleep 2
+          done
+          curl -sf http://127.0.0.1:18080/healthz
+          docker rm -f taxi_ci_$BUILD_NUMBER
+        '''
+      }
+    }
+
+    stage('Push Image') {
+      when { expression { sh(script: 'command -v docker >/dev/null', returnStatus: true) == 0 } }
+      steps {
+        sh '''
+          cd "$PROJECT_DIR"
+          docker push "$IMAGE_NAME:$IMAGE_TAG"
+          docker push "$IMAGE_NAME:latest"
+        '''
+      }
+    }
+
+    stage('Update Deployment Metadata') {
+      steps {
+        // CD is owned by Argo CD. CI only records the built image tag as an
+        // artifact; a GitOps bump (manifest image tag) is done separately.
+        sh '''
+          cd "$PROJECT_DIR"
+          echo "$IMAGE_NAME:$IMAGE_TAG" > image-tag.txt
+          cat image-tag.txt
+        '''
+        archiveArtifacts artifacts: "${PROJECT_DIR}/image-tag.txt", allowEmptyArchive: true
+      }
+    }
+  }
+
+  post {
+    success { echo "CI passed. Image: ${IMAGE_NAME}:${IMAGE_TAG}" }
+    failure { echo 'CI failed — check the failing stage above.' }
+    cleanup { sh 'rm -rf "$PROJECT_DIR/$VENV" || true' }
+  }
+}
