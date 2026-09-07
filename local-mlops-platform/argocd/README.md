@@ -13,13 +13,16 @@ flowchart LR
 
 ## What it deploys
 
-`application.yaml` points at `local-mlops-platform/gitops`, a kustomize bundle of:
+`application.yaml` uses an Argo CD **directory source** with an `include` glob so
+it deploys exactly these manifests from the repo (no duplication into a separate
+overlay):
 
 - `kubernetes/namespace.yaml` — the `mlops` namespace
 - `kubernetes/configmap.yaml` — app config
 - `kserve/inference-service.yaml` — the KServe InferenceService
 
-Sync policy: **automated** with `prune` and `selfHeal` (declarative, self-correcting).
+`secret.yaml.example` and the sklearn variant are excluded. Sync policy:
+**automated** with `prune` and `selfHeal` (declarative, self-correcting).
 
 ## Register the application
 

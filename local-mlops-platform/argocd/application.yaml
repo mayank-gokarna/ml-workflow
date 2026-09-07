@@ -12,7 +12,12 @@ spec:
   source:
     repoURL: https://github.com/mayank-gokarna/ml-workflow.git
     targetRevision: main
-    path: local-mlops-platform/gitops
+    path: local-mlops-platform
+    # Deploy exactly these manifests (avoids duplicating them into a separate
+    # overlay). secret.yaml.example and *-sklearn.yaml are intentionally excluded.
+    directory:
+      recurse: true
+      include: '{kubernetes/namespace.yaml,kubernetes/configmap.yaml,kserve/inference-service.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: mlops
@@ -23,3 +28,11 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true
+  # KServe's controller defaults/mutates the InferenceService after apply; ignore
+  # fields it manages so the app doesn't flap OutOfSync on controller-owned data.
+  ignoreDifferences:
+    - group: serving.kserve.io
+      kind: InferenceService
+      managedFieldsManagers:
+        - kserve-controller-manager
+        - manager

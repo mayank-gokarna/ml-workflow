@@ -9,8 +9,9 @@ metadata:
   namespace: mlops
   labels:
     app.kubernetes.io/part-of: local-mlops-platform
-  annotations:
-    serving.kserve.io/deploymentMode: RawDeployment
+  # No deploymentMode annotation: this cluster's KServe default is already
+  # RawDeployment. Setting it explicitly triggers the KServe webhook to reject
+  # GitOps re-applies ("cannot change deploymentMode"), so we rely on the default.
 spec:
   predictor:
     containers:
