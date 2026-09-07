@@ -1,0 +1,375 @@
+# PIPELINE DEFINITION
+# Name: nyc-taxi-training-pipeline
+# Description: Preprocess -> Train -> Evaluate -> Register for NYC taxi fare prediction
+# Inputs:
+#    min_r2: float [Default: 0.8]
+#    n_estimators: int [Default: 200.0]
+#    n_samples: int [Default: 20000.0]
+#    target: str [Default: 'fare_amount']
+components:
+  comp-evaluate:
+    executorLabel: exec-evaluate
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        min_r2:
+          defaultValue: 0.8
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+  comp-preprocess:
+    executorLabel: exec-preprocess
+    inputDefinitions:
+      parameters:
+        n_samples:
+          defaultValue: 20000.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        random_state:
+          defaultValue: 42.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        target:
+          defaultValue: fare_amount
+          isOptional: true
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-register-model:
+    executorLabel: exec-register-model
+    inputDefinitions:
+      artifacts:
+        model_in:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        gate_passed:
+          parameterType: BOOLEAN
+    outputDefinitions:
+      artifacts:
+        registered:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-train:
+    executorLabel: exec-train
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        n_estimators:
+          defaultValue: 200.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        random_state:
+          defaultValue: 42.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-evaluate:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==2.*'\
+          \ 'pandas==2.*' 'scikit-learn==1.*' 'joblib==1.*'  &&  python3 -m pip install\
+          \ --quiet --no-warn-script-location 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate(\n    dataset: Input[Dataset],\n    model: Input[Model],\n\
+          \    metrics: Output[Metrics],\n    min_r2: float = 0.80,\n) -> bool:\n\
+          \    \"\"\"Evaluate on the dataset, log metrics, and return whether the\
+          \ gate passed.\"\"\"\n    import joblib\n    import numpy as np\n    import\
+          \ pandas as pd\n    from sklearn.metrics import mean_absolute_error, mean_squared_error,\
+          \ r2_score\n\n    features = [\n        \"trip_distance\",\n        \"passenger_count\"\
+          ,\n        \"pickup_hour\",\n        \"pickup_dayofweek\",\n        \"pu_location_id\"\
+          ,\n        \"do_location_id\",\n    ]\n    df = pd.read_csv(dataset.path)\n\
+          \    X, y = df[features], df[\"label\"]\n\n    reg = joblib.load(model.path)\n\
+          \    pred = reg.predict(X)\n\n    rmse = float(np.sqrt(mean_squared_error(y,\
+          \ pred)))\n    mae = float(mean_absolute_error(y, pred))\n    r2 = float(r2_score(y,\
+          \ pred))\n\n    metrics.log_metric(\"rmse\", rmse)\n    metrics.log_metric(\"\
+          mae\", mae)\n    metrics.log_metric(\"r2\", r2)\n\n    passed = r2 >= min_r2\n\
+          \    print(f\"evaluate: rmse={rmse:.4f} mae={mae:.4f} r2={r2:.4f} gate_passed={passed}\"\
+          )\n    return passed\n\n"
+        image: python:3.12-slim
+    exec-preprocess:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==2.*'\
+          \ 'pandas==2.*'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess(\n    dataset: Output[Dataset],\n    n_samples: int\
+          \ = 20000,\n    random_state: int = 42,\n    target: str = \"fare_amount\"\
+          ,\n):\n    \"\"\"Generate a synthetic NYC-taxi dataset and write it as CSV.\"\
+          \"\"\n    import numpy as np\n    import pandas as pd\n\n    rng = np.random.default_rng(random_state)\n\
+          \    n = n_samples\n\n    trip_distance = np.clip(rng.gamma(2.0, 1.6, n),\
+          \ 0.3, 40.0)\n    passenger_count = rng.integers(1, 7, n)\n    pickup_hour\
+          \ = rng.integers(0, 24, n)\n    pickup_dayofweek = rng.integers(0, 7, n)\n\
+          \    pu_location_id = rng.integers(1, 264, n)\n    do_location_id = rng.integers(1,\
+          \ 264, n)\n\n    is_weekend = pickup_dayofweek >= 5\n    is_rush = np.isin(pickup_hour,\
+          \ [7, 8, 9, 16, 17, 18, 19]) & ~is_weekend\n    is_night = np.isin(pickup_hour,\
+          \ [0, 1, 2, 3, 4, 5, 22, 23])\n\n    speed = np.full(n, 16.0)\n    speed[is_rush]\
+          \ = 9.0\n    speed[is_night] = 22.0\n    speed[is_weekend & ~is_night] =\
+          \ 18.0\n\n    duration = np.clip((trip_distance / speed) * 60.0 + rng.normal(0,\
+          \ 1.5, n), 1.0, None)\n    surcharge = np.where(is_rush, 2.5, 0.0) + np.where(is_night,\
+          \ 1.0, 0.0)\n    fare = np.clip(\n        3.0 + 2.5 * trip_distance + 0.5\
+          \ * duration + surcharge + rng.normal(0, 1.2, n),\n        3.0,\n      \
+          \  None,\n    )\n\n    df = pd.DataFrame(\n        {\n            \"trip_distance\"\
+          : trip_distance,\n            \"passenger_count\": passenger_count,\n  \
+          \          \"pickup_hour\": pickup_hour,\n            \"pickup_dayofweek\"\
+          : pickup_dayofweek,\n            \"pu_location_id\": pu_location_id,\n \
+          \           \"do_location_id\": do_location_id,\n            \"fare_amount\"\
+          : fare.round(2),\n            \"trip_duration\": duration.round(2),\n  \
+          \      }\n    )\n    # Keep the chosen target as the canonical 'label' column\
+          \ for downstream steps.\n    df[\"label\"] = df[target]\n    df.to_csv(dataset.path,\
+          \ index=False)\n    print(f\"preprocess: wrote {len(df)} rows -> {dataset.path}\"\
+          )\n\n"
+        image: python:3.12-slim
+    exec-register-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - register_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef register_model(model_in: dsl.Input[Model], registered: Output[Model],\
+          \ gate_passed: bool):\n    \"\"\"Placeholder 'register' step.\n\n    In\
+          \ a full setup this pushes the model to the MLflow Model Registry. Here\
+          \ it\n    only promotes the artifact when the quality gate passed, keeping\
+          \ the demo\n    self-contained (no in-cluster MLflow dependency required\
+          \ to compile/run).\n    \"\"\"\n    import shutil\n\n    if not gate_passed:\n\
+          \        raise RuntimeError(\"Quality gate failed; refusing to register\
+          \ the model.\")\n    shutil.copyfile(model_in.path, registered.path)\n \
+          \   registered.metadata[\"registered\"] = True\n    print(\"register: model\
+          \ promoted (quality gate passed)\")\n\n"
+        image: python:3.12-slim
+    exec-train:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==2.*'\
+          \ 'pandas==2.*' 'scikit-learn==1.*' 'joblib==1.*'  &&  python3 -m pip install\
+          \ --quiet --no-warn-script-location 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train(\n    dataset: Input[Dataset],\n    model: Output[Model],\n\
+          \    n_estimators: int = 200,\n    random_state: int = 42,\n):\n    \"\"\
+          \"Train a RandomForestRegressor and emit a joblib Model artifact.\"\"\"\n\
+          \    import joblib\n    import pandas as pd\n    from sklearn.ensemble import\
+          \ RandomForestRegressor\n\n    features = [\n        \"trip_distance\",\n\
+          \        \"passenger_count\",\n        \"pickup_hour\",\n        \"pickup_dayofweek\"\
+          ,\n        \"pu_location_id\",\n        \"do_location_id\",\n    ]\n   \
+          \ df = pd.read_csv(dataset.path)\n    X, y = df[features], df[\"label\"\
+          ]\n\n    reg = RandomForestRegressor(\n        n_estimators=n_estimators,\
+          \ random_state=random_state, n_jobs=-1\n    )\n    reg.fit(X, y)\n\n   \
+          \ model.metadata[\"framework\"] = \"scikit-learn\"\n    model.metadata[\"\
+          n_estimators\"] = n_estimators\n    joblib.dump(reg, model.path)\n    print(f\"\
+          train: saved model -> {model.path}\")\n\n"
+        image: python:3.12-slim
+pipelineInfo:
+  description: Preprocess -> Train -> Evaluate -> Register for NYC taxi fare prediction
+  name: nyc-taxi-training-pipeline
+root:
+  dag:
+    tasks:
+      evaluate:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate
+        dependentTasks:
+        - preprocess
+        - train
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: preprocess
+            model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train
+          parameters:
+            min_r2:
+              componentInputParameter: min_r2
+        taskInfo:
+          name: evaluate
+      preprocess:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocess
+        inputs:
+          parameters:
+            n_samples:
+              componentInputParameter: n_samples
+            target:
+              componentInputParameter: target
+        taskInfo:
+          name: preprocess
+      register-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-register-model
+        dependentTasks:
+        - evaluate
+        - train
+        inputs:
+          artifacts:
+            model_in:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train
+          parameters:
+            gate_passed:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: evaluate
+        taskInfo:
+          name: register-model
+      train:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train
+        dependentTasks:
+        - preprocess
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: preprocess
+          parameters:
+            n_estimators:
+              componentInputParameter: n_estimators
+        taskInfo:
+          name: train
+  inputDefinitions:
+    parameters:
+      min_r2:
+        defaultValue: 0.8
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      n_estimators:
+        defaultValue: 200.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      n_samples:
+        defaultValue: 20000.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      target:
+        defaultValue: fare_amount
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.17.0
