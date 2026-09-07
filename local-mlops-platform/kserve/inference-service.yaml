@@ -1,0 +1,45 @@
+# KServe InferenceService using our custom serving container (RawDeployment).
+# This is the most reliable local approach: the image bakes the trained model
+# and implements the KServe V1 dataplane, so no external object storage is
+# required. See inference-service-sklearn.yaml for the storageUri variant.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: taxi-fare-predictor
+  namespace: mlops
+  labels:
+    app.kubernetes.io/part-of: local-mlops-platform
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: localhost:5001/taxi-fare-predictor-serve:latest
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: MODEL_VERSION
+            value: "1"
+          - name: PORT
+            value: "8080"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 20

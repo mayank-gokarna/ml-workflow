@@ -1,0 +1,8 @@
+# The demo serves from the shared `mlops` namespace. Applying this is optional
+# if you already created it via kubernetes/namespace.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+  labels:
+    app.kubernetes.io/part-of: local-mlops-platform

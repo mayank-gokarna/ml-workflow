@@ -1,0 +1,32 @@
+# Canonical KServe sklearn InferenceService (storageUri variant).
+#
+# Uses KServe's built-in sklearn ServingRuntime instead of a custom image. The
+# model artifact must be reachable via storageUri. Locally that means a PVC,
+# an in-cluster HTTP/S3 (MinIO) store, or a model baked via `pvc://`/`https://`.
+# The custom-container variant (inference-service.yaml) is preferred locally
+# because it needs no external storage; keep this as the "production-style"
+# reference.
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: taxi-fare-predictor
+  namespace: mlops
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: sklearn
+      # Replace with a reachable location, e.g.:
+      #   pvc://mlops-models/taxi-fare-predictor
+      #   https://<host>/model.joblib
+      #   s3://<bucket>/taxi-fare-predictor  (with an S3/MinIO secret)
+      storageUri: "pvc://mlops-models/taxi-fare-predictor"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 512Mi
