@@ -1,0 +1,6 @@
+# Development + CI dependencies (installs runtime deps too).
+-r requirements.txt
+pytest>=8.0,<9
+pytest-cov>=5.0
+ruff>=0.6
+requests>=2.31  # used by endpoint/integration test helpers

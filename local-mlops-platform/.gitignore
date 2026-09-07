@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# ML / data artifacts (never commit trained models or large data)
+models/
+mlruns/
+mlflow.db
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+*.joblib
+*.pkl
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Secrets / local overrides
+.env
+*.local
+secret.yaml
+!secret.yaml.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
