@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 mlflow = ["mlflow>=2.14,<3"]
 data = ["pyarrow>=15"]
+serve = ["fastapi>=0.110", "uvicorn>=0.29", "prometheus-client>=0.20"]
 
 [project.scripts]
 mlops-train = "mlops_demo.train:main"

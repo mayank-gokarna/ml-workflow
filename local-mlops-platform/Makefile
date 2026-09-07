@@ -59,17 +59,30 @@ mlflow: ## Start a local MLflow tracking server (sqlite backend)
 data: ## Download a real NYC TLC sample into data/raw
 	$(PY) scripts/download_data.py
 
+.PHONY: kfp-compile
+kfp-compile: ## Compile the Kubeflow pipeline to YAML
+	$(PY) kubeflow/pipeline.py
+
 .PHONY: docker-build
 docker-build: ## Build the training/serving image
 	docker build -f docker/Dockerfile -t $(IMAGE_REF) .
+
+.PHONY: docker-build-kserve
+docker-build-kserve: ## Build the KServe serving image (bakes model; train first)
+	docker build -f docker/Dockerfile.kserve -t $(IMAGE_NAME)-serve:$(IMAGE_TAG) .
+
+.PHONY: serve
+serve: ## Run the model server locally on :8080
+	$(BIN)/uvicorn mlops_demo.serve:app --host 0.0.0.0 --port 8080
 
 .PHONY: docker-run
 docker-run: ## Run training inside the container
 	docker run --rm $(IMAGE_REF)
 
 .PHONY: docker-push
-docker-push: ## Push image to the local kind registry
+docker-push: ## Push images to the local kind registry
 	docker push $(IMAGE_REF)
+	docker push $(IMAGE_NAME)-serve:$(IMAGE_TAG)
 
 .PHONY: k8s-install
 k8s-install: ## Create the mlops namespace + base config

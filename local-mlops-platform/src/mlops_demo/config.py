@@ -62,8 +62,8 @@ class Config:
 
     # --- Training hyperparameters ---
     random_state: int = _get_int("RANDOM_STATE", 42)
-    n_estimators: int = _get_int("N_ESTIMATORS", 200)
-    max_depth: int = _get_int("MAX_DEPTH", 0)  # 0 => None (unbounded)
+    n_estimators: int = _get_int("N_ESTIMATORS", 100)
+    max_depth: int = _get_int("MAX_DEPTH", 12)  # 0 => None (unbounded); bounded keeps the model small
     test_size: float = _get_float("TEST_SIZE", 0.2)
 
     # --- Data source ---
