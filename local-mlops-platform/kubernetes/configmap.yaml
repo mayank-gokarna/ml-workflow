@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-demo-config
+  namespace: mlops
+  labels:
+    app.kubernetes.io/part-of: local-mlops-platform
+data:
+  MODEL_NAME: "taxi-fare-predictor"
+  TARGET: "fare_amount"
+  MIN_R2: "0.80"
+  # In-cluster MLflow would be referenced here, e.g.:
+  # MLFLOW_TRACKING_URI: "http://mlflow.mlops.svc.cluster.local:5000"
+  MLFLOW_EXPERIMENT_NAME: "nyc-taxi-fare"
