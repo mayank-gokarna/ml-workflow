@@ -47,7 +47,7 @@ def register_model(model_in: dsl.Input[Model], registered: Output[Model], gate_p
 )
 def iris_training_pipeline(
     n_samples: int = 20000,
-    n_estimators: int = 200,
+    n_estimators: int = 100,
     min_r2: float = 0.80,
     target: str = "fare_amount",
 ):

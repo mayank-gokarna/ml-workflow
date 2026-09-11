@@ -3,7 +3,7 @@
 # Description: Preprocess -> Train -> Evaluate -> Register for NYC taxi fare prediction
 # Inputs:
 #    min_r2: float [Default: 0.8]
-#    n_estimators: int [Default: 200.0]
+#    n_estimators: int [Default: 100.0]
 #    n_samples: int [Default: 20000.0]
 #    target: str [Default: 'fare_amount']
 components:
@@ -360,7 +360,7 @@ root:
         isOptional: true
         parameterType: NUMBER_DOUBLE
       n_estimators:
-        defaultValue: 200.0
+        defaultValue: 100.0
         isOptional: true
         parameterType: NUMBER_INTEGER
       n_samples:
