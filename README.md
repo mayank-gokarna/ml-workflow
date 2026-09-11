@@ -93,18 +93,27 @@ kubectl port-forward -n monitoring svc/grafana 3000:80
 | **Prometheus** | http://127.0.0.1:9090 | Metrics store / queries |
 | **Grafana** | http://127.0.0.1:3000 | Dashboards |
 
-### Kubeflow Pipelines UI (optional / not currently available)
+### Kubeflow Pipelines UI
 
-The Kubeflow Pipelines UI is **not running** in this cluster. The KFP 2.2.0
-`frontend` and `minio` images were removed from `gcr.io` (Google's gcr.io
-deprecation), so the standalone install can't complete. The pipeline itself is
-authored and **compiles** to `local-mlops-platform/kubeflow/nyc_taxi_pipeline.yaml`.
-If a working KFP backend is installed later, its UI is reached with:
+Kubeflow Pipelines (KFP **2.5.0**) is installed in the `kubeflow` namespace. Reach
+the UI with a port-forward:
 
 ```bash
 kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8082:80
 # UI: http://127.0.0.1:8082
 ```
+
+| Service | URL | Purpose |
+|---|---|---|
+| **Kubeflow Pipelines UI** | http://127.0.0.1:8082 | Pipelines, experiments, runs, artifacts |
+
+Notes for this environment:
+- KFP images come from **`ghcr.io/kubeflow/kfp-*`** (the older `gcr.io/ml-pipeline/*`
+  `frontend`/`minio` images were removed during Google's gcr.io deprecation).
+- `minio` is served from **`quay.io/minio/minio`** since the KFP-referenced gcr
+  image no longer exists.
+- Upload `local-mlops-platform/kubeflow/nyc_taxi_pipeline.yaml` in the UI (or via
+  the KFP SDK) to run the training pipeline.
 
 ---
 
