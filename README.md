@@ -37,6 +37,21 @@ importantly, **how to open every UI/endpoint**.
 Some services are exposed directly; in-cluster services need a `kubectl
 port-forward` first. Run these from **WSL**.
 
+### One command to bring everything up (recommended)
+
+After a reboot, host processes (MLflow) and port-forwards stop. Start them all —
+and get a status report — with:
+
+```bash
+cd local-mlops-platform
+make up        # starts MLflow (persistent) + all UI port-forwards, then prints status
+make status    # just check: prints UP/DOWN for every service
+```
+
+`make up` is idempotent (skips anything already running). MLflow now persists to
+`~/mlflow-data`, so experiments survive reboots. After `make up`, open the URLs
+below.
+
 ### Directly available (already running)
 
 | Service | URL | Purpose | Notes |
@@ -119,11 +134,22 @@ Notes for this environment:
 
 ## Quick health check
 
+Fastest — one command prints UP/DOWN for every service:
+
+```bash
+cd local-mlops-platform && make status
+```
+
+Or check individually:
+
 ```bash
 kubectl get inferenceservice -n mlops                  # model serving (expect READY=True)
-kubectl get applications -n argocd                     # GitOps app (expect Synced/Healthy)
+kubectl get applications.argoproj.io -n argocd         # GitOps app (expect Synced/Healthy)
 curl -s http://localhost:5001/v2/_catalog              # registry images
 ```
+
+> Use `applications.argoproj.io` (fully-qualified): Kubeflow installs an
+> `applications.app.k8s.io` CRD that otherwise shadows `kubectl get applications`.
 
 For everything else — setup, architecture, troubleshooting, interview notes —
 see [local-mlops-platform/docs/](local-mlops-platform/docs/).

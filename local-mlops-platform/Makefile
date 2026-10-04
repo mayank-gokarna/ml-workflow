@@ -50,10 +50,19 @@ evaluate: ## Evaluate the saved model against fresh data
 	$(PY) -m mlops_demo.evaluate
 
 .PHONY: mlflow
-mlflow: ## Start a local MLflow tracking server (sqlite backend)
+mlflow: ## Start a local MLflow tracking server (persistent sqlite backend)
+	mkdir -p $(HOME)/mlflow-data/artifacts
 	$(BIN)/mlflow server --host 127.0.0.1 --port 5000 \
-		--backend-store-uri sqlite:///mlflow.db \
-		--default-artifact-root ./mlruns
+		--backend-store-uri sqlite:///$(HOME)/mlflow-data/mlflow.db \
+		--default-artifact-root $(HOME)/mlflow-data/artifacts
+
+.PHONY: up
+up: ## Start MLflow + all UI port-forwards, then show status
+	./scripts/up.sh
+
+.PHONY: status
+status: ## Check whether every service is up and running
+	./scripts/status.sh
 
 .PHONY: data
 data: ## Download a real NYC TLC sample into data/raw
