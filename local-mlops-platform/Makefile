@@ -72,6 +72,14 @@ data: ## Download a real NYC TLC sample into data/raw
 kfp-compile: ## Compile the Kubeflow pipeline to YAML
 	$(PY) kubeflow/pipeline.py
 
+.PHONY: monitor
+monitor: ## Generate an Evidently drift + performance report into the workspace
+	$(PY) scripts/monitor_evidently.py
+
+.PHONY: evidently-ui
+evidently-ui: ## Serve the Evidently monitoring UI on :8000
+	$(BIN)/evidently ui --workspace ./monitoring/evidently_workspace --port 8000
+
 .PHONY: docker-build
 docker-build: ## Build the training/serving image
 	docker build -f docker/Dockerfile -t $(IMAGE_REF) .

@@ -60,6 +60,7 @@ c=$(http http://127.0.0.1:5000/);                 up_code "$c" && row "MLflow (5
 c=$(http http://127.0.0.1:8082/);                 up_code "$c" && row "Kubeflow UI (8082)"  UP "HTTP $c" || row "Kubeflow UI (8082)"  DOWN "HTTP ${c:-000} (port-forward?)"
 c=$(http http://127.0.0.1:8081/v1/models/taxi-fare-predictor); up_code "$c" && row "KServe API (8081)"   UP "HTTP $c" || row "KServe API (8081)"   DOWN "HTTP ${c:-000} (port-forward?)"
 c=$(http http://localhost:5001/v2/_catalog);      up_code "$c" && row "Registry (5001)"     UP "HTTP $c" || row "Registry (5001)"     DOWN "HTTP ${c:-000}"
+c=$(http http://127.0.0.1:8000/);                 up_code "$c" && row "Evidently UI (8000)"  UP "HTTP $c" || row "Evidently UI (8000)"  DOWN "HTTP ${c:-000} (make evidently-ui)"
 
 echo "======================================="
 if [ "$fail" -eq 0 ]; then echo "$(green "All services UP.")"; else echo "$(red "Some services are DOWN")  — run ./scripts/up.sh to start host services/port-forwards."; fi

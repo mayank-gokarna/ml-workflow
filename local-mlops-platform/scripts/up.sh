@@ -39,6 +39,12 @@ start_bg "mlflow" "mlflow server .*${MLFLOW_DIR}" \
   --backend-store-uri "sqlite:///$MLFLOW_DIR/mlflow.db" \
   --default-artifact-root "$MLFLOW_DIR/artifacts"
 
+# 1b) Evidently monitoring UI (only if a workspace has been generated)
+if [ -d "$PROJECT_DIR/monitoring/evidently_workspace" ]; then
+  start_bg "evidently-ui" "evidently ui .*monitoring/evidently_workspace" \
+    "$BIN/evidently" ui --workspace "$PROJECT_DIR/monitoring/evidently_workspace" --port 8000
+fi
+
 # 2) Port-forwards for in-cluster UIs (only if the cluster is reachable)
 if kubectl get nodes >/dev/null 2>&1; then
   start_bg "pf-argocd"     "port-forward.*argocd-server 8443"             kubectl port-forward -n argocd    svc/argocd-server 8443:443

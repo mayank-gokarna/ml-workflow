@@ -19,6 +19,10 @@ htmlcov/
 models/
 mlruns/
 mlflow.db
+
+# Evidently monitoring (generated reports + workspace snapshots)
+monitoring/evidently_workspace/
+monitoring/*.html
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep

@@ -108,6 +108,24 @@ kubectl port-forward -n monitoring svc/grafana 3000:80
 | **Prometheus** | http://127.0.0.1:9090 | Metrics store / queries |
 | **Grafana** | http://127.0.0.1:3000 | Dashboards |
 
+### ML monitoring — Evidently
+
+Evidently tracks **data drift**, **regression performance** (rmse/mae/r²,
+predicted vs actual), and **data quality** for the taxi model. Generate a report
+(reference training distribution vs a drifted current sample), then serve its UI:
+
+```bash
+cd local-mlops-platform
+make monitor         # build the Evidently report into monitoring/evidently_workspace
+make evidently-ui    # serve the dashboard on :8000
+```
+
+| Service | URL | Purpose |
+|---|---|---|
+| **Evidently UI** | http://127.0.0.1:8000 | Drift / performance / data-quality dashboards |
+
+(`make up` also starts the Evidently UI once a workspace exists.)
+
 ### Kubeflow Pipelines UI
 
 Kubeflow Pipelines (KFP **2.5.0**) is installed in the `kubeflow` namespace. Reach

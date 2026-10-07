@@ -5,3 +5,4 @@ pytest-cov>=5.0
 ruff>=0.6
 requests>=2.31  # used by endpoint/integration test helpers
 kfp>=2.7,<3  # compile the Kubeflow pipeline in CI
+evidently>=0.7,<0.8  # ML monitoring: data drift + regression performance
